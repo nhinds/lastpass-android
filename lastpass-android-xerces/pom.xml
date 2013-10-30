@@ -33,9 +33,6 @@
 								<include>xerces:xercesImpl</include>
 							</includes>
 							<rules>
-								<zap>
-									<pattern>META-INF.services.*</pattern>
-								</zap>
 								<keep>
 									<pattern>org.apache.xerces.jaxp.datatype.DatatypeFactoryImpl</pattern>
 								</keep>
