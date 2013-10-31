@@ -8,6 +8,7 @@ import android.app.Activity;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -21,8 +22,7 @@ import com.nhinds.lastpass.PasswordStore;
 import com.nhinds.lastpass.impl.LastPassImpl;
 
 /**
- * Activity which displays a login screen to the user, offering registration as
- * well.
+ * Activity which displays a login screen to the user.
  */
 public class LoginActivity extends Activity {
 
@@ -31,16 +31,13 @@ public class LoginActivity extends Activity {
 	 */
 	private UserLoginTask mAuthTask = null;
 
-	// Values for email and password at the time of the login attempt.
-	private String mEmail;
-	private String mPassword;
-
 	// UI references.
 	private EditText mEmailView;
 	private EditText mPasswordView;
-	private View mLoginFormView;
-	private View mLoginStatusView;
+	private EditText mOtpView;
 	private TextView mLoginStatusMessageView;
+
+	private PasswordStoreBuilder passwordStoreBuilder;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -50,27 +47,41 @@ public class LoginActivity extends Activity {
 
 		// Set up the login form.
 		this.mEmailView = (EditText) findViewById(R.id.email);
-
 		this.mPasswordView = (EditText) findViewById(R.id.password);
-		this.mPasswordView.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+		this.mOtpView = (EditText) findViewById(R.id.otp);
+
+		this.mLoginStatusMessageView = (TextView) findViewById(R.id.login_status_message);
+
+		addListener(R.id.password, R.id.sign_in_button, new Runnable() {
+			@Override
+			public void run() {
+				attemptLogin();
+			}
+		});
+		addListener(R.id.otp, R.id.sign_in_button_otp, new Runnable() {
+			@Override
+			public void run() {
+				attemptOtpLogin();
+			}
+		});
+	}
+
+	private void addListener(final int textId, final int buttonId, final Runnable action) {
+		((EditText) findViewById(textId)).setOnEditorActionListener(new TextView.OnEditorActionListener() {
 			@Override
 			public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
 				if (id == R.id.login || id == EditorInfo.IME_NULL) {
-					attemptLogin();
+					action.run();
 					return true;
 				}
 				return false;
 			}
 		});
+		findViewById(buttonId).setOnClickListener(new View.OnClickListener() {
 
-		this.mLoginFormView = findViewById(R.id.login_form);
-		this.mLoginStatusView = findViewById(R.id.login_status);
-		this.mLoginStatusMessageView = (TextView) findViewById(R.id.login_status_message);
-
-		findViewById(R.id.sign_in_button).setOnClickListener(new View.OnClickListener() {
 			@Override
-			public void onClick(View view) {
-				attemptLogin();
+			public void onClick(View v) {
+				action.run();
 			}
 		});
 	}
@@ -85,68 +96,87 @@ public class LoginActivity extends Activity {
 			return;
 		}
 
-		// Reset errors.
-		this.mEmailView.setError(null);
-		this.mPasswordView.setError(null);
-
-		// Store values at the time of the login attempt.
-		this.mEmail = this.mEmailView.getText().toString();
-		this.mPassword = this.mPasswordView.getText().toString();
-
-		boolean cancel = false;
-		View focusView = null;
-
-		// Check for a valid password.
-		if (TextUtils.isEmpty(this.mPassword)) {
-			this.mPasswordView.setError(getString(R.string.error_field_required));
-			focusView = this.mPasswordView;
-			cancel = true;
-		}
-
-		// Check for a valid email address.
-		if (TextUtils.isEmpty(this.mEmail)) {
-			this.mEmailView.setError(getString(R.string.error_field_required));
-			focusView = this.mEmailView;
-			cancel = true;
-		}
-
-		if (cancel) {
-			// There was an error; don't attempt login and focus the first
-			// form field with an error.
-			focusView.requestFocus();
-		} else {
+		if (validateNotEmpty(this.mEmailView, this.mPasswordView)) {
+			String email = this.mEmailView.getText().toString();
+			String password = this.mPasswordView.getText().toString();
 			// Show a progress spinner, and kick off a background task to
 			// perform the user login attempt.
 			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
-			showProgress(true);
-			this.mAuthTask = new UserLoginTask();
-			this.mAuthTask.execute(new LastPassImpl().getPasswordStoreBuilder(this.mEmail, this.mPassword, null));// TODO
-																													// cache
-																													// file...
+			setState(FormState.PROGRESS);
+			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, null);
+			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
+			this.mAuthTask.execute();
+		}
+	}
+
+	private void attemptOtpLogin() {
+		Log.d(getPackageName(), "Attempting OTP login");
+		if (this.mAuthTask != null) {
+			return;
+		}
+		if (this.passwordStoreBuilder == null) {
+			throw new IllegalStateException("No password store builder found");
+		}
+
+		if (validateNotEmpty(this.mOtpView)) {
+			String otp = this.mOtpView.getText().toString();
+			setState(FormState.PROGRESS);
+			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
+			this.mAuthTask.execute(otp);
+		}
+	}
+
+	private boolean validateNotEmpty(final EditText... views) {
+		boolean valid = true;
+		for (final EditText view : views) {
+			if (TextUtils.isEmpty(view.getText())) {
+				view.setError(getString(R.string.error_field_required));
+				if (valid) {
+					valid = false;
+					// focus the first field with an error
+					view.requestFocus();
+				}
+			} else {
+				// reset errors for valid fields
+				view.setError(null);
+			}
+		}
+		return valid;
+	}
+
+	private enum FormState {
+		LOGIN(R.id.login_form), OTP(R.id.login_otp_form), PROGRESS(R.id.login_status);
+
+		public final int viewId;
+
+		private FormState(final int viewId) {
+			this.viewId = viewId;
 		}
 	}
 
 	/**
-	 * Shows the progress UI and hides the login form. TODO make this less crazy
+	 * Shows the progress UI and hides the login form. TODO push some of this
+	 * into the enum
 	 */
-	private void showProgress(final boolean show) {
-		int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
+	private void setState(final FormState desiredState) {
+		for (FormState formState : FormState.values()) {
+			setVisible(formState.viewId, formState == desiredState);
+		}
+	}
 
-		this.mLoginStatusView.setVisibility(View.VISIBLE);
-		this.mLoginStatusView.animate().setDuration(shortAnimTime).alpha(show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
-			@Override
-			public void onAnimationEnd(Animator animation) {
-				LoginActivity.this.mLoginStatusView.setVisibility(show ? View.VISIBLE : View.GONE);
-			}
-		});
+	private void setVisible(final int viewId, final boolean show) {
+		final View view = findViewById(viewId);
+		if (show || view.getVisibility() == View.VISIBLE) {
+			int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
 
-		this.mLoginFormView.setVisibility(View.VISIBLE);
-		this.mLoginFormView.animate().setDuration(shortAnimTime).alpha(show ? 0 : 1).setListener(new AnimatorListenerAdapter() {
-			@Override
-			public void onAnimationEnd(Animator animation) {
-				LoginActivity.this.mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-			}
-		});
+			view.setVisibility(View.VISIBLE);
+			view.animate().setDuration(shortAnimTime).alpha(show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
+				@Override
+				public void onAnimationEnd(Animator animation) {
+					view.setVisibility(show ? View.VISIBLE : View.GONE);
+				}
+			});
+		}
 	}
 
 	private static class LoginResult {
@@ -180,12 +210,22 @@ public class LoginActivity extends Activity {
 	/**
 	 * Represents an asynchronous login task used to authenticate the user.
 	 */
-	public class UserLoginTask extends AsyncTask<PasswordStoreBuilder, Void, LoginResult> {
+	public class UserLoginTask extends AsyncTask<String, Void, LoginResult> {
+		private final PasswordStoreBuilder passwordStoreBuilder;
+
+		public UserLoginTask(PasswordStoreBuilder passwordStoreBuilder) {
+			this.passwordStoreBuilder = passwordStoreBuilder;
+		}
+
 		@Override
-		protected LoginResult doInBackground(PasswordStoreBuilder... params) {
-			PasswordStoreBuilder passwordStoreBuilder = params[0];
+		protected LoginResult doInBackground(String... params) {
 			try {
-				return new LoginResult(passwordStoreBuilder.getPasswordStore());
+				PasswordStore passwordStore;
+				if (params.length == 0)
+					passwordStore = this.passwordStoreBuilder.getPasswordStore();
+				else
+					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0]);
+				return new LoginResult(passwordStore);
 			} catch (GoogleAuthenticatorRequired authenticatorRequired) {
 				return new LoginResult(LoginFailureReason.OTP);
 			} catch (LastPassException failure) {
@@ -196,15 +236,14 @@ public class LoginActivity extends Activity {
 		@Override
 		protected void onPostExecute(final LoginResult loginResult) {
 			LoginActivity.this.mAuthTask = null;
-			showProgress(false);
-
 			if (loginResult.passwordStore != null) {
 				SoftKeyboard.setPasswordStore(loginResult.passwordStore);
 				finish();
 			} else if (loginResult.failureReason == LoginFailureReason.OTP) {
 				android.util.Log.i(getPackageName(), "OTP Required");
-				// TODO
+				setState(FormState.OTP);
 			} else {
+				setState(FormState.LOGIN);
 				LoginActivity.this.mPasswordView.setError(loginResult.reasonString);
 				LoginActivity.this.mPasswordView.requestFocus();
 			}
@@ -214,7 +253,7 @@ public class LoginActivity extends Activity {
 		protected void onCancelled() {
 			// TODO who calls me?
 			LoginActivity.this.mAuthTask = null;
-			showProgress(false);
+			setState(FormState.LOGIN);
 		}
 	}
 }
