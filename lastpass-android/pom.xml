@@ -47,12 +47,7 @@
 		
 		<!-- Implicit dependencies of jersey-client which would normally be made available by Java SE but are missing on android -->
 		<dependency>
-			<groupId>javax.xml</groupId>
-			<artifactId>jaxb-impl</artifactId>
-			<version>2.1</version>
-		</dependency>
-		<dependency>
-			<groupId>javax.xml</groupId>
+			<groupId>javax.xml.bind</groupId>
 			<artifactId>jaxb-api</artifactId>
 			<version>2.1</version>
 		</dependency>
@@ -65,11 +60,6 @@
 			<groupId>com.sun.mail</groupId>
 			<artifactId>javax.mail</artifactId>
 			<version>1.5.0</version>
-		</dependency>
-		<dependency>
-			<groupId>com.nhinds.lastpass</groupId>
-			<artifactId>lastpass-android-xerces</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 	<build>
