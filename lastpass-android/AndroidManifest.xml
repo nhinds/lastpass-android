@@ -25,13 +25,6 @@
         </service>
 
         <activity
-            android:name="com.nhinds.lastpass.android.ImePreferences"
-            android:label="@string/settings_name" >
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-            </intent-filter>
-        </activity>
-        <activity
             android:name="com.nhinds.lastpass.android.LoginActivity"
             android:label="@string/title_activity_login"
             android:windowSoftInputMode="adjustResize|stateVisible" >
