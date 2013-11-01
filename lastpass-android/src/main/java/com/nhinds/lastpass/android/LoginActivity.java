@@ -8,7 +8,6 @@ import android.app.Activity;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -28,6 +27,7 @@ import com.nhinds.lastpass.impl.LastPassImpl;
  * Activity which displays a login screen to the user.
  */
 public class LoginActivity extends Activity {
+	private static final String REMEMBERED_EMAIL_PREF = "REMEMBERED_EMAIL";
 
 	/**
 	 * Keep track of the login task to ensure we can cancel it if requested.
@@ -37,9 +37,9 @@ public class LoginActivity extends Activity {
 	// UI references.
 	private EditText mEmailView;
 	private EditText mPasswordView;
+	private CheckBox mRememberEmailView;
 
 	private EditText mOtpView;
-
 	private CheckBox mTrustDeviceView;
 	private EditText mTrustedDeviceLabelView;
 
@@ -60,6 +60,14 @@ public class LoginActivity extends Activity {
 		this.mTrustDeviceView = findTypedViewById(R.id.trust_device);
 		this.mTrustedDeviceLabelView = findTypedViewById(R.id.trusted_device_label);
 		this.mLoginStatusMessageView = findTypedViewById(R.id.login_status_message);
+		this.mRememberEmailView = findTypedViewById(R.id.remember_email);
+
+		String rememberedEmail = getRememberedEmail();
+		if (rememberedEmail != null) {
+			this.mEmailView.setText(rememberedEmail);
+			this.mRememberEmailView.setChecked(true);
+			this.mPasswordView.requestFocus();
+		}
 
 		addListener(R.id.password, R.id.sign_in_button, new Runnable() {
 			@Override
@@ -115,6 +123,9 @@ public class LoginActivity extends Activity {
 		if (validateNotEmpty(this.mEmailView, this.mPasswordView)) {
 			String email = this.mEmailView.getText().toString();
 			String password = this.mPasswordView.getText().toString();
+
+			setRememberedEmail(this.mRememberEmailView.isChecked() ? email : null);
+
 			// Show a progress spinner, and kick off a background task to
 			// perform the user login attempt.
 			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
@@ -126,7 +137,6 @@ public class LoginActivity extends Activity {
 	}
 
 	private void attemptOtpLogin() {
-		Log.d(getPackageName(), "Attempting OTP login");
 		if (this.mAuthTask != null) {
 			return;
 		}
@@ -145,6 +155,7 @@ public class LoginActivity extends Activity {
 					trustLabel = this.mTrustedDeviceLabelView.getText().toString();
 				}
 
+				this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
 				setState(FormState.PROGRESS);
 				this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
 				this.mAuthTask.execute(otp, trustLabel);
@@ -203,6 +214,14 @@ public class LoginActivity extends Activity {
 				}
 			});
 		}
+	}
+
+	private String getRememberedEmail() {
+		return getPreferences(0).getString(REMEMBERED_EMAIL_PREF, null);
+	}
+
+	private void setRememberedEmail(String email) {
+		getPreferences(0).edit().putString(REMEMBERED_EMAIL_PREF, email).apply();
 	}
 
 	/** Helper method to avoid casts when looking up views */
