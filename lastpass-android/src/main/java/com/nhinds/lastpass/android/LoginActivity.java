@@ -242,6 +242,7 @@ public class LoginActivity extends Activity {
 			} else if (loginResult.failureReason == LoginFailureReason.OTP) {
 				android.util.Log.i(getPackageName(), "OTP Required");
 				setState(FormState.OTP);
+				LoginActivity.this.mOtpView.requestFocus();
 			} else {
 				setState(FormState.LOGIN);
 				LoginActivity.this.mPasswordView.setError(loginResult.reasonString);
