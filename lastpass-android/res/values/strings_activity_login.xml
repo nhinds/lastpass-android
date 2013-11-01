@@ -5,6 +5,8 @@
     <!-- Strings related to login -->
     <string name="prompt_email">Email</string>
     <string name="prompt_otp">Google Authenticator Verification Code</string>
+    <string name="prompt_trust_device">Trust this device</string>
+    <string name="prompt_trusted_device_label">Trusted Device Label</string>
     <string name="prompt_password">Password</string>
     <string name="action_sign_in_register"><b>Sign in</b></string>
     <string name="action_sign_in_short">Sign in</string>

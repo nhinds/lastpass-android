@@ -26,6 +26,25 @@
             android:inputType="number"
             android:maxLines="1" />
 
+        <CheckBox
+            android:id="@+id/trust_device"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/prompt_trust_device" />
+
+        <EditText
+            android:id="@+id/trusted_device_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/prompt_trusted_device_label"
+            android:imeActionId="@+id/login"
+            android:imeActionLabel="@string/action_sign_in_short"
+            android:imeOptions="actionUnspecified"
+            android:inputType="text"
+            android:maxLines="1"
+            android:visibility="gone" >
+        </EditText>
+
         <Button
             android:id="@+id/sign_in_button_otp"
             android:layout_width="wrap_content"

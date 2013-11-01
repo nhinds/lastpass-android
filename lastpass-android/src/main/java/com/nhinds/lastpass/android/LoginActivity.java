@@ -12,6 +12,9 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -34,7 +37,12 @@ public class LoginActivity extends Activity {
 	// UI references.
 	private EditText mEmailView;
 	private EditText mPasswordView;
+
 	private EditText mOtpView;
+
+	private CheckBox mTrustDeviceView;
+	private EditText mTrustedDeviceLabelView;
+
 	private TextView mLoginStatusMessageView;
 
 	private PasswordStoreBuilder passwordStoreBuilder;
@@ -46,11 +54,12 @@ public class LoginActivity extends Activity {
 		setContentView(R.layout.activity_login);
 
 		// Set up the login form.
-		this.mEmailView = (EditText) findViewById(R.id.email);
-		this.mPasswordView = (EditText) findViewById(R.id.password);
-		this.mOtpView = (EditText) findViewById(R.id.otp);
-
-		this.mLoginStatusMessageView = (TextView) findViewById(R.id.login_status_message);
+		this.mEmailView = findTypedViewById(R.id.email);
+		this.mPasswordView = findTypedViewById(R.id.password);
+		this.mOtpView = findTypedViewById(R.id.otp);
+		this.mTrustDeviceView = findTypedViewById(R.id.trust_device);
+		this.mTrustedDeviceLabelView = findTypedViewById(R.id.trusted_device_label);
+		this.mLoginStatusMessageView = findTypedViewById(R.id.login_status_message);
 
 		addListener(R.id.password, R.id.sign_in_button, new Runnable() {
 			@Override
@@ -62,6 +71,13 @@ public class LoginActivity extends Activity {
 			@Override
 			public void run() {
 				attemptOtpLogin();
+			}
+		});
+
+		this.mTrustDeviceView.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				LoginActivity.this.mTrustedDeviceLabelView.setVisibility(toVisibility(isChecked));
 			}
 		});
 	}
@@ -103,7 +119,7 @@ public class LoginActivity extends Activity {
 			// perform the user login attempt.
 			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
 			setState(FormState.PROGRESS);
-			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, null);
+			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, null, LastPassDeviceId.get(this));
 			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
 			this.mAuthTask.execute();
 		}
@@ -119,10 +135,20 @@ public class LoginActivity extends Activity {
 		}
 
 		if (validateNotEmpty(this.mOtpView)) {
-			String otp = this.mOtpView.getText().toString();
-			setState(FormState.PROGRESS);
-			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
-			this.mAuthTask.execute(otp);
+			final String otp = this.mOtpView.getText().toString();
+			boolean trustDevice = this.mTrustDeviceView.isChecked();
+			if (!trustDevice || validateNotEmpty(this.mTrustedDeviceLabelView)) {
+				final String trustLabel;
+				if (!trustDevice) {
+					trustLabel = null;
+				} else {
+					trustLabel = this.mTrustedDeviceLabelView.getText().toString();
+				}
+
+				setState(FormState.PROGRESS);
+				this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
+				this.mAuthTask.execute(otp, trustLabel);
+			}
 		}
 	}
 
@@ -173,10 +199,21 @@ public class LoginActivity extends Activity {
 			view.animate().setDuration(shortAnimTime).alpha(show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
 				@Override
 				public void onAnimationEnd(Animator animation) {
-					view.setVisibility(show ? View.VISIBLE : View.GONE);
+					view.setVisibility(toVisibility(show));
 				}
 			});
 		}
+	}
+
+	/** Helper method to avoid casts when looking up views */
+	@SuppressWarnings("unchecked")
+	private <V extends View> V findTypedViewById(final int id) {
+		return (V) findViewById(id);
+	}
+
+	/** Convert a boolean into a visibility constant for {@link View#setVisibility(int)} */
+	private static int toVisibility(final boolean visible) {
+		return visible ? View.VISIBLE : View.GONE;
 	}
 
 	private static class LoginResult {
@@ -224,7 +261,7 @@ public class LoginActivity extends Activity {
 				if (params.length == 0)
 					passwordStore = this.passwordStoreBuilder.getPasswordStore();
 				else
-					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0]);
+					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0], params[1]);
 				return new LoginResult(passwordStore);
 			} catch (GoogleAuthenticatorRequired authenticatorRequired) {
 				return new LoginResult(LoginFailureReason.OTP);
