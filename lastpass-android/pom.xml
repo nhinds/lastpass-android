@@ -34,6 +34,7 @@
 			<artifactId>lastpass</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 			<exclusions>
+				<!-- Android has bundled this library so don't include it in our .apk -->
 				<exclusion>
 					<groupId>xpp3</groupId>
 					<artifactId>xpp3</artifactId>
