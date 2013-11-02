@@ -12,6 +12,8 @@
     <string name="action_sign_in_register"><b>Sign in</b></string>
     <string name="action_sign_in_short">Sign in</string>
     <string name="login_progress_signing_in">Signing in&#8230;</string>
+    <string name="login_progress_retrieving">Retrieving account data&#8230;</string>
+    <string name="login_progress_decrypting">Decrypting account data&#8230;</string>
     <string name="error_field_required">This field is required</string>
     <string name="describe_otp">Google Authenticator is required to log in. Run the Google Authenticator application, and enter your current verification code in the field below.</string>
 

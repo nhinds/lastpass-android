@@ -19,6 +19,8 @@ import android.widget.TextView;
 
 import com.nhinds.lastpass.GoogleAuthenticatorRequired;
 import com.nhinds.lastpass.LastPass.PasswordStoreBuilder;
+import com.nhinds.lastpass.LastPass.ProgressListener;
+import com.nhinds.lastpass.LastPass.ProgressStatus;
 import com.nhinds.lastpass.LastPassException;
 import com.nhinds.lastpass.PasswordStore;
 import com.nhinds.lastpass.impl.LastPassImpl;
@@ -266,7 +268,7 @@ public class LoginActivity extends Activity {
 	/**
 	 * Represents an asynchronous login task used to authenticate the user.
 	 */
-	public class UserLoginTask extends AsyncTask<String, Void, LoginResult> {
+	public class UserLoginTask extends AsyncTask<String, ProgressStatus, LoginResult> implements ProgressListener {
 		private final PasswordStoreBuilder passwordStoreBuilder;
 
 		public UserLoginTask(PasswordStoreBuilder passwordStoreBuilder) {
@@ -278,9 +280,9 @@ public class LoginActivity extends Activity {
 			try {
 				PasswordStore passwordStore;
 				if (params.length == 0)
-					passwordStore = this.passwordStoreBuilder.getPasswordStore();
+					passwordStore = this.passwordStoreBuilder.getPasswordStore(this);
 				else
-					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0], params[1]);
+					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0], params[1], this);
 				return new LoginResult(passwordStore);
 			} catch (GoogleAuthenticatorRequired authenticatorRequired) {
 				return new LoginResult(LoginFailureReason.OTP);
@@ -304,6 +306,33 @@ public class LoginActivity extends Activity {
 				LoginActivity.this.mPasswordView.setError(loginResult.reasonString);
 				LoginActivity.this.mPasswordView.requestFocus();
 			}
+		}
+
+		@Override
+		public void statusChanged(ProgressStatus status) {
+			// Queue progress update to happen on the UI thread from the background thread
+			publishProgress(status);
+		}
+
+		@Override
+		protected void onProgressUpdate(final ProgressStatus... statuses) {
+			assert statuses.length == 1;
+			// Update the progress on the UI thread
+			final int stringId;
+			switch (statuses[0]) {
+			case LOGGING_IN:
+				stringId = R.string.login_progress_signing_in;
+				break;
+			case RETRIEVING:
+				stringId = R.string.login_progress_retrieving;
+				break;
+			case DECRYPTING:
+				stringId = R.string.login_progress_decrypting;
+				break;
+			default:
+				throw new IllegalStateException();
+			}
+			LoginActivity.this.mLoginStatusMessageView.setText(stringId);
 		}
 
 		@Override
