@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="ime_name">Lastpass Keyboard (nhinds)</string>
+    
+    <string name="all_passwords">Passwords</string>
+    <string name="matching_passwords">Matching Passwords</string>
+    <string name="other_passwords">Other Passwords</string>
 </resources>

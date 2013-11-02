@@ -1,11 +1,5 @@
 package com.nhinds.lastpass.android;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
 import org.apache.commons.lang.StringUtils;
 
 import android.app.AlertDialog;
@@ -21,10 +15,7 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Toast;
 
-import com.google.common.base.Function;
-import com.google.common.collect.Collections2;
 import com.nhinds.lastpass.PasswordInfo;
 import com.nhinds.lastpass.PasswordStore;
 
@@ -77,13 +68,15 @@ public class SoftKeyboard extends InputMethodService {
 		if (passwordStore == null) {
 			startActivity(new Intent(this, LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
 		} else {
-			final List<PasswordInfo> passwords = getSortedPasswords();
+			final String hostname = getHostname();
+			final PasswordInfoListAdapter listAdapter = new PasswordInfoListAdapter(this, passwordStore.getPasswords(),
+					passwordStore.getPasswordsByHostname(hostname));
 
-			AlertDialog dialog = new AlertDialog.Builder(this).setItems(convert(passwords), new OnClickListener() {
+			AlertDialog dialog = new AlertDialog.Builder(this).setAdapter(listAdapter, new OnClickListener() {
 
 				@Override
 				public void onClick(DialogInterface dialog, int which) {
-					PasswordInfo passwordInfo = passwords.get(which);
+					PasswordInfo passwordInfo = listAdapter.getItem(which);
 					boolean password = isPassword(getCurrentInputEditorInfo().inputType);
 
 					final String text = password ? passwordInfo.getPassword() : passwordInfo.getUsername();
@@ -100,15 +93,6 @@ public class SoftKeyboard extends InputMethodService {
 			dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
 			dialog.show();
 		}
-	}
-
-	private List<PasswordInfo> getSortedPasswords() {
-		String hostname = getHostname();
-		Collection<PasswordInfo> passwordsForCurrentField = passwordStore.getPasswordsByHostname(hostname);
-		Toast.makeText(this, hostname, Toast.LENGTH_SHORT).show();
-		final List<PasswordInfo> passwords = new ArrayList<PasswordInfo>(passwordStore.getPasswords());
-		Collections.sort(passwords, new BestMatchFirstComparator(passwordsForCurrentField));
-		return passwords;
 	}
 
 	private String getHostname() {
@@ -129,36 +113,7 @@ public class SoftKeyboard extends InputMethodService {
 				|| variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD;
 	}
 
-	private static String[] convert(Collection<? extends PasswordInfo> passwords) {
-		return Collections2.transform(passwords, new Function<PasswordInfo, String>() {
-
-			@Override
-			public String apply(PasswordInfo passwordInfo) {
-				return passwordInfo.getName();
-			}
-		}).toArray(new String[passwords.size()]);
-	}
-
 	private void switchToLastInputMethod() {
 		this.mInputMethodManager.switchToLastInputMethod(getWindow().getWindow().getAttributes().token);
-	}
-
-	private static class BestMatchFirstComparator implements Comparator<PasswordInfo> {
-		private final Collection<PasswordInfo> bestMatches;
-
-		public BestMatchFirstComparator(Collection<PasswordInfo> bestMatches) {
-			this.bestMatches = bestMatches;
-		}
-
-		@Override
-		public int compare(PasswordInfo lhs, PasswordInfo rhs) {
-			boolean lhsMatches = this.bestMatches.contains(lhs);
-			boolean rhsMatches = this.bestMatches.contains(rhs);
-			if (lhsMatches != rhsMatches) {
-				return lhsMatches ? -1 : 1;
-			}
-			return lhs.getName().compareToIgnoreCase(rhs.getName());
-		}
-
 	}
 }
