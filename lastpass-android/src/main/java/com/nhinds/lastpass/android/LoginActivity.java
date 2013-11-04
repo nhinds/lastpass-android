@@ -1,5 +1,7 @@
 package com.nhinds.lastpass.android;
 
+import java.io.File;
+
 import org.apache.commons.lang.Validate;
 
 import android.animation.Animator;
@@ -132,10 +134,15 @@ public class LoginActivity extends Activity {
 			// perform the user login attempt.
 			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
 			setState(FormState.PROGRESS);
-			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, null, LastPassDeviceId.get(this));
+			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, getCacheFile(),
+					LastPassDeviceId.get(this));
 			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
 			this.mAuthTask.execute();
 		}
+	}
+
+	private File getCacheFile() {
+		return new File(getCacheDir(), "login.dat");
 	}
 
 	private void attemptOtpLogin() {
