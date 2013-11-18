@@ -7,9 +7,11 @@ import org.apache.commons.lang.Validate;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -47,8 +49,6 @@ public class LoginActivity extends Activity {
 	private CheckBox mTrustDeviceView;
 	private EditText mTrustedDeviceLabelView;
 
-	private TextView mLoginStatusMessageView;
-
 	private PasswordStoreBuilder passwordStoreBuilder;
 
 	@Override
@@ -63,7 +63,6 @@ public class LoginActivity extends Activity {
 		this.mOtpView = findTypedViewById(R.id.otp);
 		this.mTrustDeviceView = findTypedViewById(R.id.trust_device);
 		this.mTrustedDeviceLabelView = findTypedViewById(R.id.trusted_device_label);
-		this.mLoginStatusMessageView = findTypedViewById(R.id.login_status_message);
 		this.mRememberEmailView = findTypedViewById(R.id.remember_email);
 
 		String rememberedEmail = getRememberedEmail();
@@ -130,10 +129,7 @@ public class LoginActivity extends Activity {
 
 			setRememberedEmail(this.mRememberEmailView.isChecked() ? email : null);
 
-			// Show a progress spinner, and kick off a background task to
-			// perform the user login attempt.
-			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
-			setState(FormState.PROGRESS);
+			// kick off a background task to perform the user login attempt.
 			this.passwordStoreBuilder = LastPassFactory.getCachingLastPass(getCacheFile()).getPasswordStoreBuilder(email, password,
 					LastPassDeviceId.get(this));
 			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
@@ -164,8 +160,6 @@ public class LoginActivity extends Activity {
 					trustLabel = this.mTrustedDeviceLabelView.getText().toString();
 				}
 
-				this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
-				setState(FormState.PROGRESS);
 				this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
 				this.mAuthTask.execute(otp, trustLabel);
 			}
@@ -191,7 +185,7 @@ public class LoginActivity extends Activity {
 	}
 
 	private enum FormState {
-		LOGIN(R.id.login_form), OTP(R.id.login_otp_form), PROGRESS(R.id.login_status);
+		LOGIN(R.id.login_form), OTP(R.id.login_otp_form);
 
 		public final int viewId;
 
@@ -277,9 +271,17 @@ public class LoginActivity extends Activity {
 	 */
 	public class UserLoginTask extends AsyncTask<String, ProgressStatus, LoginResult> implements ProgressListener {
 		private final PasswordStoreBuilder passwordStoreBuilder;
+		private ProgressDialog progressDialog;
 
 		public UserLoginTask(PasswordStoreBuilder passwordStoreBuilder) {
 			this.passwordStoreBuilder = passwordStoreBuilder;
+		}
+
+		@Override
+		protected void onPreExecute() {
+			this.progressDialog = new ProgressDialog(LoginActivity.this);
+			this.progressDialog.setTitle(getString(R.string.login_progress_signing_in));
+			this.progressDialog.show();
 		}
 
 		@Override
@@ -291,15 +293,18 @@ public class LoginActivity extends Activity {
 				else
 					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0], params[1], this);
 				return new LoginResult(passwordStore);
-			} catch (GoogleAuthenticatorRequired authenticatorRequired) {
+			} catch (final GoogleAuthenticatorRequired authenticatorRequired) {
+				Log.d(getPackageName(), "Google authenticator required", authenticatorRequired);
 				return new LoginResult(LoginFailureReason.OTP);
-			} catch (LastPassException failure) {
+			} catch (final LastPassException failure) {
+				Log.e(getPackageName(), "Error logging in", failure);
 				return new LoginResult(LoginFailureReason.FAIL, failure.getMessage());
 			}
 		}
 
 		@Override
 		protected void onPostExecute(final LoginResult loginResult) {
+			this.progressDialog.dismiss();
 			LoginActivity.this.mAuthTask = null;
 			if (loginResult.passwordStore != null) {
 				SoftKeyboard.setPasswordStore(loginResult.passwordStore);
@@ -325,8 +330,9 @@ public class LoginActivity extends Activity {
 		protected void onProgressUpdate(final ProgressStatus... statuses) {
 			assert statuses.length == 1;
 			// Update the progress on the UI thread
+			final ProgressStatus status = statuses[0];
 			final int stringId;
-			switch (statuses[0]) {
+			switch (status) {
 			case LOGGING_IN:
 				stringId = R.string.login_progress_signing_in;
 				break;
@@ -339,7 +345,7 @@ public class LoginActivity extends Activity {
 			default:
 				throw new IllegalStateException();
 			}
-			LoginActivity.this.mLoginStatusMessageView.setText(stringId);
+			this.progressDialog.setMessage(getString(stringId));
 		}
 
 		@Override

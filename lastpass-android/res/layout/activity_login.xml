@@ -3,11 +3,6 @@
     tools:context=".LoginActivity" >
 
     <include
-        android:id="@+id/login_status"
-        layout="@layout/login_status"
-        android:visibility="gone" />
-
-    <include
         android:id="@+id/login_form"
         layout="@layout/login_form" />
 
