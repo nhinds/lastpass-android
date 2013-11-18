@@ -15,6 +15,7 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 
 import com.nhinds.lastpass.PasswordInfo;
 import com.nhinds.lastpass.PasswordStore;
@@ -31,6 +32,12 @@ public class SoftKeyboard extends InputMethodService {
 	static void setPasswordStore(PasswordStore passwordStore) {
 		// TODO This sucks, why is this so difficult to accomplish in android?
 		SoftKeyboard.passwordStore = passwordStore;
+	}
+
+	static void logout() {
+		assert passwordStore != null;
+		// TODO call a method to kill the session once this is implemented in lastpass-java
+		passwordStore = null;
 	}
 
 	@Override
@@ -72,14 +79,12 @@ public class SoftKeyboard extends InputMethodService {
 			final PasswordInfoListAdapter listAdapter = new PasswordInfoListAdapter(this, passwordStore.getPasswords(),
 					passwordStore.getPasswordsByHostname(hostname));
 
-			AlertDialog dialog = new AlertDialog.Builder(this).setAdapter(listAdapter, new OnClickListener() {
+			final AlertDialog dialog = new AlertDialog.Builder(this).setAdapter(listAdapter, new OnClickListener() {
 
 				@Override
 				public void onClick(DialogInterface dialog, int which) {
 					PasswordInfo passwordInfo = listAdapter.getItem(which);
-					boolean password = isPassword(getCurrentInputEditorInfo().inputType);
-
-					final String text = password ? passwordInfo.getPassword() : passwordInfo.getUsername();
+					final String text = isPasswordInput() ? passwordInfo.getPassword() : passwordInfo.getUsername();
 					getCurrentInputConnection().commitText(text, AFTER_INSERTED_TEXT);
 				}
 			}).setOnDismissListener(new OnDismissListener() {
@@ -89,10 +94,29 @@ public class SoftKeyboard extends InputMethodService {
 					switchToLastInputMethod();
 				}
 			}).create();
+			dialog.setCustomTitle(getTitleBar(dialog));
 			makeDialogWork(dialog);
 			dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
 			dialog.show();
 		}
+	}
+
+	private View getTitleBar(final AlertDialog dialog) {
+		final View titleBar = getLayoutInflater().inflate(R.layout.password_titlebar, null);
+		if (!isPasswordInput()) {
+			final TextView titleText = (TextView) titleBar.findViewById(R.id.popup_title);
+			titleText.setText(R.string.choose_username);
+		}
+
+		final View logoutButton = titleBar.findViewById(R.id.logout_button);
+		logoutButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				logout();
+				dialog.cancel();
+			}
+		});
+		return titleBar;
 	}
 
 	private String getHostname() {
@@ -115,5 +139,9 @@ public class SoftKeyboard extends InputMethodService {
 
 	private void switchToLastInputMethod() {
 		this.mInputMethodManager.switchToLastInputMethod(getWindow().getWindow().getAttributes().token);
+	}
+
+	private boolean isPasswordInput() {
+		return isPassword(getCurrentInputEditorInfo().inputType);
 	}
 }

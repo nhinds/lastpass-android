@@ -2,6 +2,10 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="ime_name">Lastpass Keyboard (nhinds)</string>
     
+    <string name="choose_username">Choose Username</string>
+    <string name="choose_password">Choose Password</string>
+    <string name="logout">Logout</string>
+    
     <string name="all_passwords">Passwords</string>
     <string name="matching_passwords">Matching Passwords</string>
     <string name="other_passwords">Other Passwords</string>
