@@ -24,8 +24,8 @@ import com.nhinds.lastpass.LastPass.PasswordStoreBuilder;
 import com.nhinds.lastpass.LastPass.ProgressListener;
 import com.nhinds.lastpass.LastPass.ProgressStatus;
 import com.nhinds.lastpass.LastPassException;
+import com.nhinds.lastpass.LastPassFactory;
 import com.nhinds.lastpass.PasswordStore;
-import com.nhinds.lastpass.impl.LastPassImpl;
 
 /**
  * Activity which displays a login screen to the user.
@@ -134,7 +134,7 @@ public class LoginActivity extends Activity {
 			// perform the user login attempt.
 			this.mLoginStatusMessageView.setText(R.string.login_progress_signing_in);
 			setState(FormState.PROGRESS);
-			this.passwordStoreBuilder = new LastPassImpl().getPasswordStoreBuilder(email, password, getCacheFile(),
+			this.passwordStoreBuilder = LastPassFactory.getCachingLastPass(getCacheFile()).getPasswordStoreBuilder(email, password,
 					LastPassDeviceId.get(this));
 			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
 			this.mAuthTask.execute();
