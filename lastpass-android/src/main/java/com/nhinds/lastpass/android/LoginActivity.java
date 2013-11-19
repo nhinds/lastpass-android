@@ -220,11 +220,11 @@ public class LoginActivity extends Activity {
 	}
 
 	private String getRememberedEmail() {
-		return getPreferences(0).getString(REMEMBERED_EMAIL_PREF, null);
+		return getPreferences(Activity.MODE_PRIVATE).getString(REMEMBERED_EMAIL_PREF, null);
 	}
 
 	private void setRememberedEmail(String email) {
-		getPreferences(0).edit().putString(REMEMBERED_EMAIL_PREF, email).apply();
+		getPreferences(Activity.MODE_PRIVATE).edit().putString(REMEMBERED_EMAIL_PREF, email).apply();
 	}
 
 	/** Helper method to avoid casts when looking up views */
