@@ -33,7 +33,6 @@ import com.nhinds.lastpass.PasswordStore;
  * Activity which displays a login screen to the user.
  */
 public class LoginActivity extends Activity {
-	private static final String REMEMBERED_EMAIL_PREF = "REMEMBERED_EMAIL";
 
 	/**
 	 * Keep track of the login task to ensure we can cancel it if requested.
@@ -44,16 +43,21 @@ public class LoginActivity extends Activity {
 	private EditText mEmailView;
 	private EditText mPasswordView;
 	private CheckBox mRememberEmailView;
+	private CheckBox mRememberPasswordView;
 
 	private EditText mOtpView;
 	private CheckBox mTrustDeviceView;
 	private EditText mTrustedDeviceLabelView;
 
 	private PasswordStoreBuilder passwordStoreBuilder;
+	
+	private Preferences preferences;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		this.preferences = new Preferences(this);
 
 		setContentView(R.layout.activity_login);
 
@@ -64,12 +68,21 @@ public class LoginActivity extends Activity {
 		this.mTrustDeviceView = findTypedViewById(R.id.trust_device);
 		this.mTrustedDeviceLabelView = findTypedViewById(R.id.trusted_device_label);
 		this.mRememberEmailView = findTypedViewById(R.id.remember_email);
+		this.mRememberPasswordView = findTypedViewById(R.id.remember_password);
 
-		String rememberedEmail = getRememberedEmail();
+		String rememberedEmail = this.preferences.getRememberedEmail();
 		if (rememberedEmail != null) {
 			this.mEmailView.setText(rememberedEmail);
 			this.mRememberEmailView.setChecked(true);
+			this.mRememberPasswordView.setEnabled(true);
 			this.mPasswordView.requestFocus();
+		}
+		String rememberedPassword = this.preferences.getRememberedPassword();
+		if (rememberedPassword != null) {
+			this.mPasswordView.setText(rememberedPassword);
+			this.mRememberPasswordView.setChecked(true);
+			// TODO automatically login here - just calling attemptLogin() seems to get us 
+			// into a bad state, probably because the input method is still our LastPass keyboard when we finish
 		}
 
 		addListener(R.id.password, R.id.sign_in_button, new Runnable() {
@@ -89,6 +102,13 @@ public class LoginActivity extends Activity {
 			@Override
 			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 				LoginActivity.this.mTrustedDeviceLabelView.setVisibility(toVisibility(isChecked));
+			}
+		});
+		
+		this.mRememberEmailView.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				LoginActivity.this.mRememberPasswordView.setEnabled(isChecked);
 			}
 		});
 	}
@@ -127,7 +147,9 @@ public class LoginActivity extends Activity {
 			String email = this.mEmailView.getText().toString();
 			String password = this.mPasswordView.getText().toString();
 
-			setRememberedEmail(this.mRememberEmailView.isChecked() ? email : null);
+			boolean rememberEmail = this.mRememberEmailView.isChecked();
+			boolean rememberPassword = rememberEmail && this.mRememberPasswordView.isChecked();
+			this.preferences.setRememberedEmailAndPassword(rememberEmail ? email : null, rememberPassword ? password : null);
 
 			// kick off a background task to perform the user login attempt.
 			this.passwordStoreBuilder = LastPassFactory.getCachingLastPass(getCacheFile()).getPasswordStoreBuilder(email, password,
@@ -217,14 +239,6 @@ public class LoginActivity extends Activity {
 				}
 			});
 		}
-	}
-
-	private String getRememberedEmail() {
-		return getPreferences(Activity.MODE_PRIVATE).getString(REMEMBERED_EMAIL_PREF, null);
-	}
-
-	private void setRememberedEmail(String email) {
-		getPreferences(Activity.MODE_PRIVATE).edit().putString(REMEMBERED_EMAIL_PREF, email).apply();
 	}
 
 	/** Helper method to avoid casts when looking up views */

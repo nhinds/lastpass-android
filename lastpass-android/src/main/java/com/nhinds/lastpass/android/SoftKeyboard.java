@@ -26,6 +26,7 @@ public class SoftKeyboard extends InputMethodService {
 	private InputMethodManager mInputMethodManager;
 
 	private View mInputView;
+	private Preferences preferences;
 
 	private static PasswordStore passwordStore;
 
@@ -44,6 +45,7 @@ public class SoftKeyboard extends InputMethodService {
 	public void onCreate() {
 		super.onCreate();
 		this.mInputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+		this.preferences = new Preferences(this);
 	}
 
 	@Override
@@ -113,6 +115,7 @@ public class SoftKeyboard extends InputMethodService {
 			@Override
 			public void onClick(View v) {
 				logout();
+				SoftKeyboard.this.preferences.setRememberedPassword(null);
 				dialog.cancel();
 			}
 		});

@@ -36,6 +36,13 @@
             android:layout_height="wrap_content"
             android:text="@string/prompt_remember_email" />
 
+        <CheckBox
+            android:id="@+id/remember_password"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/prompt_remember_password"
+            android:enabled="false" />
+
         <Button
             android:id="@+id/sign_in_button"
             android:layout_width="wrap_content"
