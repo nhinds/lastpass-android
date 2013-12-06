@@ -1,6 +1,8 @@
 package com.nhinds.lastpass.android;
 
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -9,7 +11,6 @@ import android.content.DialogInterface.OnDismissListener;
 import android.content.Intent;
 import android.inputmethodservice.InputMethodService;
 import android.text.InputType;
-import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
@@ -21,6 +22,8 @@ import com.nhinds.lastpass.PasswordInfo;
 import com.nhinds.lastpass.PasswordStore;
 
 public class SoftKeyboard extends InputMethodService {
+	private static final Logger LOGGER = LoggerFactory.getLogger(SoftKeyboard.class);
+	
 	private static final int AFTER_INSERTED_TEXT = 1;
 
 	private InputMethodManager mInputMethodManager;
@@ -56,7 +59,7 @@ public class SoftKeyboard extends InputMethodService {
 		this.mInputView.post(new Runnable() {
 			@Override
 			public void run() {
-				Log.i(getPackageName(), "Bing");
+				LOGGER.trace("Input view token is now valid");
 				bing();
 			}
 		});

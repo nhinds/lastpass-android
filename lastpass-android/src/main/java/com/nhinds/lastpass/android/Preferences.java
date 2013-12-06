@@ -4,6 +4,8 @@ import java.security.GeneralSecurityException;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.nhinds.lastpass.encryption.AES256EncryptionProvider;
 import com.nhinds.lastpass.encryption.EncryptionProvider;
@@ -13,9 +15,10 @@ import com.nhinds.lastpass.encryption.PBKDF2SHA256KeyProvider;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 public class Preferences {
+	private static final Logger LOGGER = LoggerFactory.getLogger(Preferences.class);
+	
 	private static final String PREFERENCES_NAME = Preferences.class.getSimpleName();
 	
 	private static final String REMEMBERED_EMAIL_PREF = "REMEMBERED_EMAIL";
@@ -23,7 +26,6 @@ public class Preferences {
 	
 	private static final KeyProvider KEY_PROVIDER = new PBKDF2SHA256KeyProvider();
 	private static final int KEY_ITERATIONS = 100;
-	private static final Hex HEX = new Hex();
 	
 	private final Context context;
 	private EncryptionProvider encryptionProvider;
@@ -102,7 +104,7 @@ public class Preferences {
 		try {
 			return getEncryptionProvider().decrypt(Hex.decodeHex(preference.toCharArray()));
 		} catch (final DecoderException e) {
-			Log.e(this.context.getPackageName(), "Error decrypting string, returning null", e);
+			LOGGER.error("Error decrypting string, returning null", e);
 			return null;
 		}
 	}

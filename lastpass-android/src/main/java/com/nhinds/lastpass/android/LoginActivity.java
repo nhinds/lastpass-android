@@ -3,6 +3,8 @@ package com.nhinds.lastpass.android;
 import java.io.File;
 
 import org.apache.commons.lang.Validate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -11,7 +13,6 @@ import android.app.ProgressDialog;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -33,6 +34,7 @@ import com.nhinds.lastpass.PasswordStore;
  * Activity which displays a login screen to the user.
  */
 public class LoginActivity extends Activity {
+	private static final Logger LOGGER = LoggerFactory.getLogger(LoginActivity.class);
 
 	/**
 	 * Keep track of the login task to ensure we can cancel it if requested.
