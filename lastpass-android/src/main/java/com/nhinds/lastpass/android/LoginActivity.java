@@ -1,8 +1,5 @@
 package com.nhinds.lastpass.android;
 
-import java.io.File;
-
-import org.apache.commons.lang.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,7 +7,6 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.KeyEvent;
@@ -22,24 +18,22 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.nhinds.lastpass.GoogleAuthenticatorRequired;
-import com.nhinds.lastpass.LastPass.PasswordStoreBuilder;
-import com.nhinds.lastpass.LastPass.ProgressListener;
-import com.nhinds.lastpass.LastPass.ProgressStatus;
-import com.nhinds.lastpass.LastPassException;
-import com.nhinds.lastpass.LastPassFactory;
-import com.nhinds.lastpass.PasswordStore;
+import com.nhinds.lastpass.android.UserLoginTaskFactory.UserLoginListener;
+import com.nhinds.lastpass.android.UserLoginTaskFactory.UserLoginResult;
 
 /**
  * Activity which displays a login screen to the user.
  */
-public class LoginActivity extends Activity {
+public class LoginActivity extends Activity implements UserLoginListener {
 	private static final Logger LOGGER = LoggerFactory.getLogger(LoginActivity.class);
+	
+	public static final String CACHED_OTP_LOGIN = LoginActivity.class.getName()+"#CachedOtpLogin";
+	public static final String ERROR_EXTRA_KEY = LoginActivity.class.getName()+"#Error";
 
 	/**
 	 * Keep track of the login task to ensure we can cancel it if requested.
 	 */
-	private UserLoginTask mAuthTask = null;
+	private UserLoginTaskFactory mAuthTaskFactory;
 
 	// UI references.
 	private EditText mEmailView;
@@ -51,8 +45,6 @@ public class LoginActivity extends Activity {
 	private CheckBox mTrustDeviceView;
 	private EditText mTrustedDeviceLabelView;
 
-	private PasswordStoreBuilder passwordStoreBuilder;
-	
 	private Preferences preferences;
 
 	@Override
@@ -62,7 +54,7 @@ public class LoginActivity extends Activity {
 		this.preferences = new Preferences(this);
 
 		setContentView(R.layout.activity_login);
-
+		
 		// Set up the login form.
 		this.mEmailView = findTypedViewById(R.id.email);
 		this.mPasswordView = findTypedViewById(R.id.password);
@@ -83,8 +75,6 @@ public class LoginActivity extends Activity {
 		if (rememberedPassword != null) {
 			this.mPasswordView.setText(rememberedPassword);
 			this.mRememberPasswordView.setChecked(true);
-			// TODO automatically login here - just calling attemptLogin() seems to get us 
-			// into a bad state, probably because the input method is still our LastPass keyboard when we finish
 		}
 
 		addListener(R.id.password, R.id.sign_in_button, new Runnable() {
@@ -113,8 +103,20 @@ public class LoginActivity extends Activity {
 				LoginActivity.this.mRememberPasswordView.setEnabled(isChecked);
 			}
 		});
+		
+		// If we were launched with a "cached OTP login" intent, show the OTP form to login with the cached/remembered email and password
+		if (CACHED_OTP_LOGIN.equals(getIntent().getAction()) && rememberedEmail != null && rememberedPassword != null) {
+			createAuthTaskFactory(rememberedEmail, rememberedPassword);
+			setState(FormState.OTP);
+		} else {
+			// Set the password error if one was specified in the intent
+			final CharSequence errorFromIntent = getIntent().getCharSequenceExtra(ERROR_EXTRA_KEY);
+			if (errorFromIntent != null) {
+				this.mPasswordView.setError(errorFromIntent);
+			}
+		}
 	}
-
+	
 	private void addListener(final int textId, final int buttonId, final Runnable action) {
 		((EditText) findViewById(textId)).setOnEditorActionListener(new TextView.OnEditorActionListener() {
 			@Override
@@ -141,7 +143,7 @@ public class LoginActivity extends Activity {
 	 * actual login attempt is made.
 	 */
 	private void attemptLogin() {
-		if (this.mAuthTask != null) {
+		if (this.mAuthTaskFactory != null) {
 			return;
 		}
 
@@ -154,23 +156,18 @@ public class LoginActivity extends Activity {
 			this.preferences.setRememberedEmailAndPassword(rememberEmail ? email : null, rememberPassword ? password : null);
 
 			// kick off a background task to perform the user login attempt.
-			this.passwordStoreBuilder = LastPassFactory.getCachingLastPass(getCacheFile()).getPasswordStoreBuilder(email, password,
-					LastPassDeviceId.get(this));
-			this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
-			this.mAuthTask.execute();
+			createAuthTaskFactory(email, password);
+			this.mAuthTaskFactory.loginWithoutOtp();
 		}
 	}
 
-	private File getCacheFile() {
-		return new File(getCacheDir(), "login.dat");
+	private void createAuthTaskFactory(final String email, final String password) {
+		this.mAuthTaskFactory = UserLoginTaskFactory.create(email, password, this, this);
 	}
 
 	private void attemptOtpLogin() {
-		if (this.mAuthTask != null) {
-			return;
-		}
-		if (this.passwordStoreBuilder == null) {
-			throw new IllegalStateException("No password store builder found");
+		if (this.mAuthTaskFactory != null) {
+			throw new IllegalStateException("No login task factory found");
 		}
 
 		if (validateNotEmpty(this.mOtpView)) {
@@ -184,10 +181,34 @@ public class LoginActivity extends Activity {
 					trustLabel = this.mTrustedDeviceLabelView.getText().toString();
 				}
 
-				this.mAuthTask = new UserLoginTask(this.passwordStoreBuilder);
-				this.mAuthTask.execute(otp, trustLabel);
+				this.mAuthTaskFactory.loginWithOtp(otp, trustLabel);
 			}
 		}
+	}
+	
+	@Override
+	public void loginCompleted(final UserLoginResult loginResult) {
+		this.mAuthTaskFactory = null;
+		if (loginResult.passwordStore != null) {
+			SoftKeyboard.setPasswordStore(loginResult.passwordStore);
+			finish();
+		} else {
+			switch (loginResult.failureReason) {
+			case OTP:
+				LOGGER.debug("OTP Required");
+				setState(FormState.OTP);
+				break;
+			case FAIL:
+			case CANCEL:
+				setState(FormState.LOGIN);
+				this.mPasswordView.setError(loginResult.reasonString);
+			}
+		}
+	}
+	
+	@Override
+	public void progressDialogCreated(ProgressDialog dialog) {
+		// nothing to do
 	}
 
 	private boolean validateNotEmpty(final EditText... views) {
@@ -209,12 +230,14 @@ public class LoginActivity extends Activity {
 	}
 
 	private enum FormState {
-		LOGIN(R.id.login_form), OTP(R.id.login_otp_form);
+		LOGIN(R.id.login_form, R.id.password), OTP(R.id.login_otp_form, R.id.otp);
 
 		public final int viewId;
+		public final int afterLoginEditId;
 
-		private FormState(final int viewId) {
+		private FormState(final int viewId, final int afterLoginEditId) {
 			this.viewId = viewId;
+			this.afterLoginEditId = afterLoginEditId;
 		}
 	}
 
@@ -226,6 +249,7 @@ public class LoginActivity extends Activity {
 		for (FormState formState : FormState.values()) {
 			setVisible(formState.viewId, formState == desiredState);
 		}
+		findViewById(desiredState.afterLoginEditId).requestFocus();
 	}
 
 	private void setVisible(final int viewId, final boolean show) {
@@ -252,123 +276,5 @@ public class LoginActivity extends Activity {
 	/** Convert a boolean into a visibility constant for {@link View#setVisibility(int)} */
 	private static int toVisibility(final boolean visible) {
 		return visible ? View.VISIBLE : View.GONE;
-	}
-
-	private static class LoginResult {
-		public final LoginFailureReason failureReason;
-		public final PasswordStore passwordStore;
-		public final String reasonString;
-
-		public LoginResult(PasswordStore passwordStore) {
-			Validate.notNull(passwordStore);
-			this.passwordStore = passwordStore;
-			this.failureReason = null;
-			this.reasonString = null;
-		}
-
-		public LoginResult(LoginFailureReason failureReason, String reasonString) {
-			Validate.notNull(failureReason);
-			this.failureReason = failureReason;
-			this.reasonString = reasonString;
-			this.passwordStore = null;
-		}
-
-		public LoginResult(LoginFailureReason failureReason) {
-			this(failureReason, null);
-		}
-	}
-
-	private enum LoginFailureReason {
-		FAIL, OTP
-	}
-
-	/**
-	 * Represents an asynchronous login task used to authenticate the user.
-	 */
-	public class UserLoginTask extends AsyncTask<String, ProgressStatus, LoginResult> implements ProgressListener {
-		private final PasswordStoreBuilder passwordStoreBuilder;
-		private ProgressDialog progressDialog;
-
-		public UserLoginTask(PasswordStoreBuilder passwordStoreBuilder) {
-			this.passwordStoreBuilder = passwordStoreBuilder;
-		}
-
-		@Override
-		protected void onPreExecute() {
-			this.progressDialog = new ProgressDialog(LoginActivity.this);
-			this.progressDialog.setTitle(getString(R.string.login_progress_signing_in));
-			this.progressDialog.show();
-		}
-
-		@Override
-		protected LoginResult doInBackground(String... params) {
-			try {
-				PasswordStore passwordStore;
-				if (params.length == 0)
-					passwordStore = this.passwordStoreBuilder.getPasswordStore(this);
-				else
-					passwordStore = this.passwordStoreBuilder.getPasswordStore(params[0], params[1], this);
-				return new LoginResult(passwordStore);
-			} catch (final GoogleAuthenticatorRequired authenticatorRequired) {
-				Log.d(getPackageName(), "Google authenticator required", authenticatorRequired);
-				return new LoginResult(LoginFailureReason.OTP);
-			} catch (final LastPassException failure) {
-				Log.e(getPackageName(), "Error logging in", failure);
-				return new LoginResult(LoginFailureReason.FAIL, failure.getMessage());
-			}
-		}
-
-		@Override
-		protected void onPostExecute(final LoginResult loginResult) {
-			this.progressDialog.dismiss();
-			LoginActivity.this.mAuthTask = null;
-			if (loginResult.passwordStore != null) {
-				SoftKeyboard.setPasswordStore(loginResult.passwordStore);
-				finish();
-			} else if (loginResult.failureReason == LoginFailureReason.OTP) {
-				android.util.Log.i(getPackageName(), "OTP Required");
-				setState(FormState.OTP);
-				LoginActivity.this.mOtpView.requestFocus();
-			} else {
-				setState(FormState.LOGIN);
-				LoginActivity.this.mPasswordView.setError(loginResult.reasonString);
-				LoginActivity.this.mPasswordView.requestFocus();
-			}
-		}
-
-		@Override
-		public void statusChanged(ProgressStatus status) {
-			// Queue progress update to happen on the UI thread from the background thread
-			publishProgress(status);
-		}
-
-		@Override
-		protected void onProgressUpdate(final ProgressStatus... statuses) {
-			assert statuses.length == 1;
-			// Update the progress on the UI thread
-			final ProgressStatus status = statuses[0];
-			final int stringId;
-			switch (status) {
-			case LOGGING_IN:
-				stringId = R.string.login_progress_signing_in;
-				break;
-			case RETRIEVING:
-				stringId = R.string.login_progress_retrieving;
-				break;
-			case DECRYPTING:
-				stringId = R.string.login_progress_decrypting;
-				break;
-			default:
-				throw new IllegalStateException();
-			}
-			this.progressDialog.setMessage(getString(stringId));
-		}
-
-		@Override
-		protected void onCancelled() {
-			// TODO who calls me?
-			LoginActivity.this.mAuthTask = null;
-			setState(FormState.LOGIN);
-		}
 	}
 }

@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.DialogInterface.OnDismissListener;
@@ -20,6 +21,9 @@ import android.widget.TextView;
 
 import com.nhinds.lastpass.PasswordInfo;
 import com.nhinds.lastpass.PasswordStore;
+import com.nhinds.lastpass.android.UserLoginTaskFactory.LoginFailureReason;
+import com.nhinds.lastpass.android.UserLoginTaskFactory.UserLoginListener;
+import com.nhinds.lastpass.android.UserLoginTaskFactory.UserLoginResult;
 
 public class SoftKeyboard extends InputMethodService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SoftKeyboard.class);
@@ -68,17 +72,45 @@ public class SoftKeyboard extends InputMethodService {
 
 	@Override
 	public void onStartInputView(EditorInfo info, boolean restarting) {
-		if (getPackageName().equals(getCurrentInputEditorInfo().packageName)) {
-			Log.i(getPackageName(), "Run away away");
+		final String applicationPackage = getPackageName();
+		final String editorPackage = getCurrentInputEditorInfo().packageName;
+		if (applicationPackage.equals(editorPackage)) {
+			LOGGER.debug("Detected an editor from this application's package {}, switching to last input method", applicationPackage);
 			switchToLastInputMethod();
 		} else {
-			Log.i(getPackageName(), "This input seems to be fine");
+			LOGGER.debug("This editor seems to be fine: {}", editorPackage);
 		}
 	}
 
 	private void bing() {
 		if (passwordStore == null) {
-			startActivity(new Intent(this, LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+			String rememberedEmail = preferences.getRememberedEmail();
+			String rememberedPassword = preferences.getRememberedPassword();
+			if (rememberedEmail != null && rememberedPassword != null) {
+				UserLoginTaskFactory.create(rememberedEmail, rememberedPassword, getApplicationContext(), new UserLoginListener() {
+					
+					@Override
+					public void loginCompleted(UserLoginResult result) {
+						if (result.passwordStore != null) {
+							setPasswordStore(result.passwordStore);
+							bing();
+						} else {
+							LOGGER.debug("Error logging in: {} ({})", result.failureReason, result.reasonString);
+							if (result.failureReason == LoginFailureReason.OTP)
+								switchToLoginActivity(LoginActivity.CACHED_OTP_LOGIN, null);
+							else
+								switchToLoginActivity(null, result.reasonString);
+						}
+					}
+					
+					@Override
+					public void progressDialogCreated(ProgressDialog dialog) {
+						makeDialogWork(dialog);
+					}
+				}).loginWithoutOtp();
+			} else {
+				switchToLoginActivity(null, null);
+			}
 		} else {
 			final String hostname = getHostname();
 			final PasswordInfoListAdapter listAdapter = new PasswordInfoListAdapter(this, passwordStore.getPasswords(),
@@ -106,6 +138,10 @@ public class SoftKeyboard extends InputMethodService {
 		}
 	}
 
+	private void switchToLoginActivity(String action, String errorString) {
+		startActivity(new Intent(action, null, this, LoginActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(LoginActivity.ERROR_EXTRA_KEY, errorString));
+	}
+	
 	private View getTitleBar(final AlertDialog dialog) {
 		final View titleBar = getLayoutInflater().inflate(R.layout.password_titlebar, null);
 		if (!isPasswordInput()) {
