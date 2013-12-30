@@ -166,7 +166,7 @@ public class LoginActivity extends Activity implements UserLoginListener {
 	}
 
 	private void attemptOtpLogin() {
-		if (this.mAuthTaskFactory != null) {
+		if (this.mAuthTaskFactory == null) {
 			throw new IllegalStateException("No login task factory found");
 		}
 
@@ -188,7 +188,6 @@ public class LoginActivity extends Activity implements UserLoginListener {
 	
 	@Override
 	public void loginCompleted(final UserLoginResult loginResult) {
-		this.mAuthTaskFactory = null;
 		if (loginResult.passwordStore != null) {
 			SoftKeyboard.setPasswordStore(loginResult.passwordStore);
 			finish();
@@ -200,6 +199,7 @@ public class LoginActivity extends Activity implements UserLoginListener {
 				break;
 			case FAIL:
 			case CANCEL:
+				this.mAuthTaskFactory = null;
 				setState(FormState.LOGIN);
 				this.mPasswordView.setError(loginResult.reasonString);
 			}
