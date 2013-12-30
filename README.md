@@ -17,3 +17,7 @@ Building
         $ cd lastpass-android
         $ mvn package
         $ mvn android:deploy
+
+License
+--------
+`lastpass-android` is released under the [MIT license](LICENSE)
