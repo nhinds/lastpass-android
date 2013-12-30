@@ -5,8 +5,8 @@
     android:versionName="pi (rounding up)" >
 
     <uses-sdk
-        android:minSdkVersion="17"
-        android:targetSdkVersion="17" />
+        android:minSdkVersion="16"
+        android:targetSdkVersion="16" />
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application

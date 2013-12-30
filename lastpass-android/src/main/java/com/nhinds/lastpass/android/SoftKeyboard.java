@@ -124,14 +124,15 @@ public class SoftKeyboard extends InputMethodService {
 					final String text = isPasswordInput() ? passwordInfo.getPassword() : passwordInfo.getUsername();
 					getCurrentInputConnection().commitText(text, AFTER_INSERTED_TEXT);
 				}
-			}).setOnDismissListener(new OnDismissListener() {
+			}).create();
+			dialog.setCustomTitle(getTitleBar(dialog));
+			dialog.setOnDismissListener(new OnDismissListener() {
 
 				@Override
 				public void onDismiss(DialogInterface dialog) {
 					switchToLastInputMethod();
 				}
-			}).create();
-			dialog.setCustomTitle(getTitleBar(dialog));
+			});
 			makeDialogWork(dialog);
 			dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
 			dialog.show();
